@@ -1,0 +1,22 @@
+{
+  "name": "blockchain-nodejs",
+  "version": "1.0.0",
+  "description": "Simple blockchain",
+  "main": "main.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/NikoEscobar/Blockchain-NodeJS.git"
+  },
+  "author": "Niko Escobar",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/NikoEscobar/Blockchain-NodeJS/issues"
+  },
+  "homepage": "https://github.com/NikoEscobar/Blockchain-NodeJS#readme",
+  "dependencies": {
+    "crypto-js": "^3.1.9-1"
+  }
+}
