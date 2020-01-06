@@ -1,11 +1,42 @@
 const SHA256 = require('crypto-js/sha256');
+const EC = require('elliptic').ec;
+const ec = new EC('secp256k1');
 
+//need timeStamp in hash to be unique
 class Transaction {
   constructor(senderAddress, recipientAddress, amount, data = '') {
     this.senderAddress = senderAddress;
     this.recipientAddress = recipientAddress;
     this.amount = amount;
     this.data = data;
+  }
+
+  calculateHash() {
+    return SHA256(
+      this.senderAddress + this.recipientAddress + this.amount + this.data
+    ).toString();
+  }
+
+  signTransaction(signingKey) {
+    if (signingKey.getPublic('hex') !== this.senderAddress) {
+      throw new Error('You cannot sign transactions for other wallets!');
+    }
+
+    const hashTx = this.calculateHash();
+    const sig = signingKey.sign(hashTx, 'base64');
+    this.signature = sig.toDER('hex');
+  }
+
+  isValid() {
+    if (this.senderAddress === null) return true;
+
+    if (!this.signature || this.signature.length === 0) {
+      throw new Error('No signature in this transaction');
+    }
+
+    const publicKey = ec.keyFromPublic(this.senderAddress, 'hex');
+
+    return publicKey.verify(this.calculateHash(), this.signature);
   }
 }
 
@@ -36,6 +67,16 @@ class Block {
     }
     console.log('Block Mined! ' + this.hash + '\n Nonce Number: ' + this.nonce);
   }
+
+  hasValidTransaction() {
+    for (const tx of this.transactions) {
+      if (!tx.isValid()) {
+        return false;
+      }
+    }
+
+    return true;
+  }
 }
 
 class Blockchain {
@@ -55,7 +96,11 @@ class Blockchain {
   }
 
   minePendingTransactions(miningRewardAddress) {
-    let block = new Block(Date.now(), this.pendingTransactions);
+    let block = new Block(
+      Date.now(),
+      this.pendingTransactions,
+      this.getLatestBlock().hash
+    );
     block.mineBlock(this.difficulty);
 
     console.log('Block successfully mined!');
@@ -66,12 +111,20 @@ class Blockchain {
         null,
         miningRewardAddress,
         this.miningReward,
-        'Reward from mining.'
+        'Congratulations!, Here your reward from mining the previously block.'
       )
     ];
   }
 
-  createTransaction(transaction) {
+  addTransaction(transaction) {
+    if (!transaction.senderAddress || !transaction.recipientAddress) {
+      throw new Error('Transaction must include sender and recipient Adresses');
+    }
+
+    if (!transaction.isValid()) {
+      throw new Error('Cannot add invalid transaction to chain');
+    }
+
     this.pendingTransactions.push(transaction);
   }
 
@@ -97,11 +150,19 @@ class Blockchain {
       const currentBlock = this.chain[i];
       const previousBlock = this.chain[i - 1];
 
+      if (!currentBlock.hasValidTransaction()) {
+        return false;
+      }
+
       if (currentBlock.hash !== currentBlock.calculateHash()) {
         return false;
       }
 
       if (currentBlock.previousHash !== previousBlock.hash) {
+        console.log('got here 3');
+        console.log('block index', i);
+        console.log('currentBlock.previousHash:', currentBlock.previousHash);
+        console.log('previousBlock.hash', previousBlock.hash);
         return false;
       }
     }
@@ -109,48 +170,5 @@ class Blockchain {
   }
 }
 
-let blockchain = new Blockchain();
-
-//makes sense for 'address 1' to become negative by now
-blockchain.createTransaction(
-  new Transaction(
-    'address 1',
-    'address 2',
-    100,
-    'Hello buddy take 100 cripto units for you...'
-  )
-);
-blockchain.createTransaction(
-  new Transaction(
-    'address 2',
-    'address 1',
-    90,
-    'Thanks Wolf, you rock!, but I just need 10...'
-  )
-);
-
-console.log('\n Starting the miner...');
-blockchain.minePendingTransactions('Miner Address');
-
-console.log(
-  '\n Balance of Miner is',
-  blockchain.getBalanceOfAddress('Miner Address')
-);
-// console.log(
-//   '\n Balance of address 1 is',
-//   blockchain.getBalanceOfAddress('address 1')
-// );
-// console.log(
-//   '\n Balance of address 2 is',
-//   blockchain.getBalanceOfAddress('address 2')
-// );
-
-// console.dir({ Chain: blockchain.chain }, { depth: null });
-
-console.log('\n Starting the miner again...');
-blockchain.minePendingTransactions('Miner Address');
-
-console.log(
-  '\n Balance of Miner is',
-  blockchain.getBalanceOfAddress('Miner Address')
-);
+module.exports.Blockchain = Blockchain;
+module.exports.Transaction = Transaction;
